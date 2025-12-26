@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DragcapiAllInOne {
+
+    /* ========== ADMIN ========== */
+    address public admin;
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    /* ========== KYC SYSTEM ========== */
+    mapping(address => bool) public kycApproved;
+
+    function approveKyc(address user) external onlyAdmin {
+        kycApproved[user] = true;
+    }
+
+    function revokeKyc(address user) external onlyAdmin {
+        kycApproved[user] = false;
+    }
+
+     mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external onlyAdmin {
+        require(kycApproved[to], "User not KYC");
+        balanceOf[to] += amount;
+        totalSupply += amount;
+    }
+
+    function transfer(address to, uint256 amount) external {
+        require(kycApproved[msg.sender], "Sender not KYC");
+        require(kycApproved[to], "Receiver not KYC");
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+    }
+
+    /* ========== DAILY VOTING SYSTEM ========== */
+
+    uint256 public voteStartTime;
+    uint256 public voteEndTime;
+    bool public votingActive;
+
+    struct VoteOption {
+        uint256 openingPrice;
+        uint256 closingPrice;
+        uint256 totalVotes;
+    }
+
+    VoteOption[] public options;
+    mapping(address => bool) public hasVoted;
+
+    // Admin starts voting at 12:00 AM
+    function startDailyVoting() external onlyAdmin {
+        delete options;
+        voteStartTime = block.timestamp;
+        voteEndTime = voteStartTime + 3 minutes;
+        votingActive = true;
+    }
+
+    // Users submit price options during voting window
+    function addVoteOption(uint256 openPrice, uint256 closePrice) external {
+        require(votingActive, "Voting not active");
+        require(block.timestamp <= voteEndTime, "Voting closed");
+        require(kycApproved[msg.sender], "Not KYC");
+
+        options.push(
+            VoteOption(openPrice, closePrice, 0)
+        );
+    }
+
+    // Vote using token balance
+    function vote(uint256 optionId) external {
+        require(votingActive, "Voting not active");
+        require(block.timestamp <= voteEndTime, "Voting closed");
+        require(!hasVoted[msg.sender], "Already voted");
+        require(kycApproved[msg.sender], "Not KYC");
+
+        uint256 weight = balanceOf[msg.sender];
+        require(weight > 0, "No tokens");
+
+        options[optionId].totalVotes += weight;
+        hasVoted[msg.sender] = true;
+    }
+
+    // End voting after 12:03 AM
+    function endVoting() external onlyAdmin {
+        require(block.timestamp > voteEndTime, "Voting still running");
+        votingActive = false;
+
+        // Reset vote status for next day
+        for (uint256 i = 0; i < options.length; i++) {}
+    }
+
+    // Get winning option
+    function winningOption() public view returns (
+        uint256 openingPrice,
+        uint256 closingPrice
+    ) {
+        uint256 highestVotes;
+        uint256 winnerIndex;
+
+        for (uint256 i = 0; i < options.length; i++) {
+            if (options[i].totalVotes > highestVotes) {
+                highestVotes = options[i].totalVotes;
+                winnerIndex = i;
+            }
+        }
+
+        return (
+            options[winnerIndex].openingPrice,
+            options[winnerIndex].closingPrice
+        );
+    }
+}
