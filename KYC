@@ -1,0 +1,11 @@
+const express = require("express");
+const { processKYC } = require("./kycFlow");
+
+const app = express();
+app.use(express.json());
+
+app.post("/kyc", processKYC);
+
+app.listen(4000, () => {
+  console.log("Dragcapi KYC Server running");
+});
