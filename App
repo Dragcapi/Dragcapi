@@ -1,0 +1,30 @@
+function openApp() {
+  alert("PLEASE ENTER PROPER DETAILS. NOT CHANGEABLE.");
+}
+
+function registerFamily(data) {
+  if (!data.married) {
+    if (!data.father || !data.mother) {
+      alert("Parents biometric required. App closed.");
+      return;
+    }
+  }
+
+  submitToServer(data);
+}
+
+function submitToServer(data) {
+  fetch("/kyc", {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers: { "Content-Type": "application/json" }
+  })
+    .then(res => res.json())
+    .then(result => {
+      if (result.status === "REJECTED") {
+        alert("KYC Rejected");
+      } else {
+        alert("Approval under review");
+      }
+    });
+}
