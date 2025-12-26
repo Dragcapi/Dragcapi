@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DragcapiEcosystem {
+
+    /* ========== ADMIN ========== */
+    address public admin;
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only ADMIN allowed");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    /* ========== DEVELOPER CONTROL ========== */
+    mapping(address => bool) public blockedDevelopers;
+
+    /* ========== APP REGISTRY ========== */
+    struct App {
+        address developer;
+        string appName;
+        bool active;
+        bool pricingViolation;
+    }
+
+    uint256 public appCount;
+    mapping(uint256 => App) public apps;
+
+    /* ========== PRICING (ADMIN ONLY) ========== */
+    uint256 public ecosystemPrice;
+
+    /* ========== EVENTS ========== */
+    event AppCreated(uint256 appId, address developer, string name);
+    event AppDisabled(uint256 appId, address developer);
+    event DeveloperBlocked(address developer);
+    event PriceSet(uint256 price);
+
+    /* ========== APP CREATION ========== */
+    function createApp(string calldata appName) external {
+        require(!blockedDevelopers[msg.sender], "Developer blocked");
+
+        apps[appCount] = App({
+            developer: msg.sender,
+            appName: appName,
+            active: true,
+            pricingViolation: false
+        });
+
+        emit AppCreated(appCount, msg.sender, appName);
+        appCount++;
+    }
+
+    /* ========== ADMIN PRICING CONTROL ========== */
+    function setEcosystemPrice(uint256 price) external onlyAdmin {
+        ecosystemPrice = price;
+        emit PriceSet(price);
+    }
+
+    /* ========== ILLEGAL PRICING ATTEMPT ========== */
+    function attemptToSetPrice(uint256 appId) external {
+        App storage app = apps[appId];
+
+        require(app.active, "App not active");
+        require(msg.sender == app.developer, "Not app developer");
+
+        // 🚨 PRICING VIOLATION
+        app.pricingViolation = true;
+        app.active = false;
+
+        blockedDevelopers[msg.sender] = true;
+
+        emit AppDisabled(appId, msg.sender);
+        emit DeveloperBlocked(msg.sender);
+    }
+
+    /* ========== VIEW HELPERS ========== */
+    function isAppActive(uint256 appId) external view returns (bool) {
+        return apps[appId].active;
+    }
+
+    function getApp(uint256 appId) external view returns (
+        address developer,
+        string memory name,
+        bool active,
+        bool pricingViolation
+    ) {
+        App memory app = apps[appId];
+        return (
+            app.developer,
+            app.appName,
+            app.active,
+            app.pricingViolation
+        );
+    }
+}
