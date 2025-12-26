@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/*
+ Dragcapi Closed-Loop Ecosystem Coin
+ - Non-withdrawable
+ - No external transfers
+ - Ecosystem-only transactions
+ - Admin controlled rules
+*/
+
+contract DragcapiClosedMoney {
+
+    /* ========== ADMIN ========== */
+    address public admin;
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only ADMIN");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    /* ========== KYC SYSTEM ========== */
+    mapping(address => bool) public kycApproved;
+
+    function approveKYC(address user) external onlyAdmin {
+        kycApproved[user] = true;
+    }
+
+    function revokeKYC(address user) external onlyAdmin {
+        kycApproved[user] = false;
+    }
+
+    /* ========== ECOSYSTEM REGISTRY ========== */
+    mapping(address => bool) public ecosystemApps;
+
+    function registerEcosystemApp(address app) external onlyAdmin {
+        ecosystemApps[app] = true;
+    }
+
+    function removeEcosystemApp(address app) external onlyAdmin {
+        ecosystemApps[app] = false;
+    }
+
+    /* ========== TOKEN LOGIC (CLOSED MONEY) ========== */
+    string public name = "Dragcapi Humanity Coin";
+    string public symbol = "DRG-H";
+    uint8 public decimals = 18;
+    uint256 public totalSupply;
+
+    mapping(address => uint256) public balanceOf;
+
+    /* ========== EVENTS ========== */
+    event Transfer(address from, address to, uint256 amount);
+    event Mint(address to, uint256 amount);
+
+    /* ========== MINT (ADMIN ONLY) ========== */
+    function mint(address to, uint256 amount) external onlyAdmin {
+        require(kycApproved[to], "User not KYC");
+        balanceOf[to] += amount;
+        totalSupply += amount;
+
+        emit Mint(to, amount);
+    }
+
+    /* ========== INTERNAL ECOSYSTEM TRANSFER ========== */
+    function ecosystemTransfer(address to, uint256 amount) external {
+        require(kycApproved[msg.sender], "Sender not KYC");
+        require(kycApproved[to] || ecosystemApps[to], "Outside ecosystem");
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+
+        emit Transfer(msg.sender, to, amount);
+    }
+
+    /* ========== BLOCK ALL WITHDRAWALS ========== */
+
+    // ❌ No ETH withdrawal
+    receive() external payable {
+        revert("Withdrawals not allowed");
+    }
+
+    // ❌ No token approval (DEX / bridge prevention)
+    function approve(address, uint256) external pure {
+        revert("Approvals disabled");
+    }
+
+    // ❌ No allowance
+    function allowance(address, address) external pure returns (uint256) {
+        return 0;
+    }
+
+    // ❌ No transferFrom
+    function transferFrom(address, address, uint256) external pure {
+        revert("transferFrom disabled");
+    }
+
+    // ❌ No burn (prevents exit via supply manipulation)
+    function burn(uint256) external pure {
+        revert("Burn not allowed");
+    }
+
+    /* ========== PHILOSOPHY STATEMENT (ON-CHAIN) ========== */
+    function vision() external pure returns (string memory) {
+        return "Dragcapi Coin is a closed-loop ecosystem currency designed as new money for humanity, focused on internal value exchange, not extraction.";
+    }
+}
