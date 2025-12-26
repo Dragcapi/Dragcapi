@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DragcapiCoin {
+    string public name = "Dragcapi Coin";
+    string public symbol = "Di";
+    uint256 public totalSupply;
+
+    address public owner;
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => bool) public blockedAddresses;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor(uint256 _supply) {
+        owner = msg.sender;
+        totalSupply = _supply * 10 ** decimals;
+        balanceOf[msg.sender] = totalSupply;
+    }
+
+    // Owner can block DEX / CEX / contract addresses
+    function blockAddress(address _addr) external onlyOwner {
+        blockedAddresses[_addr] = true;
+    }
+
+    function unblockAddress(address _addr) external onlyOwner {
+        blockedAddresses[_addr] = false;
+    }
+
+    // Core transfer logic (P2P only)
+    function transfer(address _to, uint256 _amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= _amount, "Insufficient balance");
+        require(!blockedAddresses[msg.sender], "Sender blocked");
+        require(!blockedAddresses[_to], "Receiver blocked");
+
+        // ❗ Prevent transfers to smart contracts (DEX protection)
+        require(_to.code.length == 0, "Contracts not allowed");
+
+        balanceOf[msg.sender] -= _amount;
+        balanceOf[_to] += _amount;
+
+        emit Transfer(msg.sender, _to, _amount);
+        return true;
+    }
+}
