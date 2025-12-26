@@ -1,0 +1,30 @@
+const { biometricVerify } = require("./biometricCheck");
+const { generateID } = require("./idGenerator");
+
+function processKYC(req, res) {
+  const data = req.body;
+
+  if (!data.mobile || !data.family) {
+    return res.status(400).json({ error: "Invalid data" });
+  }
+
+  // Parents biometric mandatory
+  if (
+    !biometricVerify(data.father) ||
+    !biometricVerify(data.mother)
+  ) {
+    return res.json({
+      status: "REJECTED",
+      reason: "Parents biometric not cleared"
+    });
+  }
+
+  const uniqueID = generateID();
+
+  res.json({
+    status: "UNDER_REVIEW",
+    assignedID: uniqueID
+  });
+}
+
+module.exports = { processKYC };
