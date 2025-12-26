@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DragcapiChain {
+
+    address public coreTeam;
+
+    uint256 constant DAILY_LIMIT = 100000000; // 1 Crore INR (reference)
+    uint256 constant COIN_VALUE = 8000000000; // 80 Cr INR (reference)
+
+    struct Family {
+        bool kycApproved;
+        bool parentsBioClear;
+        uint256 dailyUsed;
+        uint256 lastReset;
+        string uniqueID;
+    }
+
+    mapping(address => Family) public families;
+
+    event KYCSubmitted(address user);
+    event KYCApproved(address user, string uniqueID);
+    event KYCRejected(address user);
+    event TransferRecorded(address from, string toID, uint256 amount);
+
+    modifier onlyCore() {
+        require(msg.sender == coreTeam, "Core team only");
+        _;
+    }
+
+    constructor() {
+        coreTeam = msg.sender;
+    }
+
+    function submitKYC() external {
+        emit KYCSubmitted(msg.sender);
+    }
+
+    function approveKYC(
+        address user,
+        bool parentsBioClear,
+        string calldata uniqueID
+    ) external onlyCore {
+        require(parentsBioClear, "Parents biometric not cleared");
+
+        families[user] = Family({
+            kycApproved: true,
+            parentsBioClear: true,
+            dailyUsed: 0,
+            lastReset: block.timestamp,
+            uniqueID: uniqueID
+        });
+
+        emit KYCApproved(user, uniqueID);
+    }
+
+    function rejectKYC(address user) external onlyCore {
+        delete families[user];
+        emit KYCRejected(user);
+    }
+
+    function resetDaily(address user) internal {
+        if (block.timestamp > families[user].lastReset + 1 days) {
+            families[user].dailyUsed = 0;
+            families[user].lastReset = block.timestamp;
+        }
+    }
+
+    function transferByID(string calldata toID, uint256 amount) external {
+        Family storage f = families[msg.sender];
+        require(f.kycApproved, "KYC not approved");
+
+        resetDaily(msg.sender);
+        require(f.dailyUsed + amount <= DAILY_LIMIT, "Daily limit exceeded");
+
+        f.dailyUsed += amount;
+        emit TransferRecorded(msg.sender, toID, amount);
+    }
+}
