@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/*
+ DI Coin
+ Purpose: Identity-based internal ecosystem token
+ Not tradable publicly
+ Fixed value inside system
+*/
+
+contract DICoin {
+    string public name = "DI Coin";
+    string public symbol = "DI";
+    
+
+    address public admin;
+    uint256 public fixedValue; // agreed internal value
+
+    mapping(address => bool) public verifiedIdentity;
+    mapping(address => uint256) private balances;
+
+    event IdentityVerified(address user);
+    event IdentityRemoved(address user);
+    event Minted(address to, uint256 amount);
+    event Transferred(address from, address to, uint256 amount);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not authorized");
+        _;
+    }
+
+    modifier onlyVerified(address user) {
+        require(verifiedIdentity[user], "Identity not verified");
+        _;
+    }
+
+    constructor(uint256 _fixedValue) {
+        admin = msg.sender;
+        fixedValue = _fixedValue;
+    }
+
+    // Verify identity (manual or external system)
+    function verifyIdentity(address user) external onlyAdmin {
+        verifiedIdentity[user] = true;
+        emit IdentityVerified(user);
+    }
+
+    function removeIdentity(address user) external onlyAdmin {
+        verifiedIdentity[user] = false;
+        emit IdentityRemoved(user);
+    }
+
+    // Mint DI Coin only to verified identities
+    function mint(address to, uint256 amount)
+        external
+        onlyAdmin
+        onlyVerified(to)
+    {
+        balances[to] += amount;
+        emit Minted(to, amount);
+    }
+
+    // Transfer only between verified identities
+    function transfer(address to, uint256 amount)
+        external
+        onlyVerified(msg.sender)
+        onlyVerified(to)
+    {
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        balances[msg.sender] -= amount;
+        balances[to] += amount;
+        emit Transferred(msg.sender, to, amount);
+    }
+
+    function balanceOf(address user) external view returns (uint256) {
+        return balances[user];
+    }
+}
