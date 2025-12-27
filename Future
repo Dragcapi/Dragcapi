@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/*
+ Dragcapi Blockchain Core
+ Human-only, DAO-governed, ultra-secure ecosystem
+*/
+
+contract DragcapiCore {
+    address public dao;
+
+    constructor(address _dao) {
+        dao = _dao;
+    }
+
+    /* ─────────────────────────────
+        IDENTITY (HUMAN ONLY)
+    ───────────────────────────── */
+
+    struct Identity {
+        bool verified;
+        bytes32 biometricHash;     // fingerprint / biometric proof (off-chain)
+        bytes32 uniqueDeviceHash;  // device + SIM + hardware binding
+        address[] familyApprovers;
+    }
+
+    mapping(address => Identity) private identities;
+
+    modifier onlyDAO() {
+        require(msg.sender == dao, "DAO approval required");
+        _;
+    }
+
+    modifier onlyVerified() {
+        require(identities[msg.sender].verified, "Human verification required");
+        _;
+    }
+
+    function verifyIdentity(
+        address user,
+        bytes32 biometricHash,
+        bytes32 deviceHash,
+        address[] calldata family
+    ) external onlyDAO {
+        identities[user] = Identity({
+            verified: true,
+            biometricHash: biometricHash,
+            uniqueDeviceHash: deviceHash,
+            familyApprovers: family
+        });
+    }
+
+    /* ─────────────────────────────
+        TRANSACTION SECURITY (3 LAYERS)
+    ───────────────────────────── */
+
+    struct TransactionRequest {
+        address from;
+        address to;
+        uint256 amount;
+        uint256 approvals;
+        bool executed;
+    }
+
+    mapping(uint256 => TransactionRequest) public txRequests;
+    mapping(uint256 => mapping(address => bool)) public approvedBy;
+
+    uint256 public txCount;
+
+    function requestTransaction(address to, uint256 amount)
+        external
+        onlyVerified
+    {
+        txRequests[txCount] = TransactionRequest({
+            from: msg.sender,
+            to: to,
+            amount: amount,
+            approvals: 0,
+            executed: false
+        });
+        txCount++;
+    }
+
+    function approveTransaction(uint256 txId)
+        external
+    {
+        require(!txRequests[txId].executed, "Already executed");
+
+        // family-level approval
+        bool isFamily = false;
+        address[] memory fam = identities[txRequests[txId].from].familyApprovers;
+
+        for (uint256 i = 0; i < fam.length; i++) {
+            if (fam[i] == msg.sender) {
+                isFamily = true;
+            }
+        }
+
+        require(isFamily, "Not authorized family member");
+        require(!approvedBy[txId][msg.sender], "Already approved");
+
+        approvedBy[txId][msg.sender] = true;
+        txRequests[txId].approvals++;
+    }
+}
