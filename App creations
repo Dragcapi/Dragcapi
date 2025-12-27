@@ -1,0 +1,129 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/*
+ Dragcapi Ecosystem Contract
+ - Ultra KYC Identity Registry
+ - Bot-proof App Creation
+ - Goods & Services Ecosystem
+*/
+
+contract DragcapiEcosystem {
+    address public admin;
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    /* ─────────────────────────────
+        IDENTITY (ULTRA KYC)
+    ───────────────────────────── */
+
+    struct Identity {
+        bool verified;
+        uint256 verifiedAt;
+        bytes32 kycHash; // off-chain ultra KYC proof hash
+    }
+
+    mapping(address => Identity) private identities;
+
+    event IdentityVerified(address indexed user);
+    event IdentityRevoked(address indexed user);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin allowed");
+        _;
+    }
+
+    modifier onlyVerified() {
+        require(identities[msg.sender].verified, "KYC required");
+        _;
+    }
+
+    function verifyIdentity(address user, bytes32 kycHash)
+        external
+        onlyAdmin
+    {
+        identities[user] = Identity({
+            verified: true,
+            verifiedAt: block.timestamp,
+            kycHash: kycHash
+        });
+
+        emit IdentityVerified(user);
+    }
+
+    function revokeIdentity(address user)
+        external
+        onlyAdmin
+    {
+        identities[user].verified = false;
+        emit IdentityRevoked(user);
+    }
+
+    function isVerified(address user)
+        external
+        view
+        returns (bool)
+    {
+        return identities[user].verified;
+    }
+
+    /* ─────────────────────────────
+        APP CREATION (NO BOTS)
+    ───────────────────────────── */
+
+    struct App {
+        uint256 id;
+        string name;
+        address creator;
+        uint256 createdAt;
+        bool active;
+    }
+
+    App[] private apps;
+
+    event AppCreated(
+        uint256 indexed appId,
+        string name,
+        address indexed creator
+    );
+
+    function createApp(string calldata name)
+        external
+        onlyVerified
+    {
+        require(bytes(name).length > 2, "Invalid app name");
+
+        uint256 appId = apps.length;
+
+        apps.push(
+            App({
+                id: appId,
+                name: name,
+                creator: msg.sender,
+                createdAt: block.timestamp,
+                active: true
+            })
+        );
+
+        emit AppCreated(appId, name, msg.sender);
+    }
+
+    function totalApps()
+        external
+        view
+        returns (uint256)
+    {
+        return apps.length;
+    }
+
+    function getApp(uint256 appId)
+        external
+        view
+        returns (App memory)
+    {
+        require(appId < apps.length, "App not found");
+        return apps[appId];
+    }
+}
