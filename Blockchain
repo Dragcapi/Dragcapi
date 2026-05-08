@@ -5,7 +5,7 @@ contract DragcapiChain {
 
     address public coreTeam;
 
-    uint256 constant DAILY_LIMIT = 100000; // 1 Lakh INR (reference)
+    uint256 constant DAILY_LIMIT = 28000; // 28000 INR (reference)
     uint256 constant COIN_VALUE = 8000000000; // 80 Cr INR (reference)
 
     struct Family {
